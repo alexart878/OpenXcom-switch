@@ -416,3 +416,34 @@ target_link_libraries(openxcom
 set_target_properties(openxcom PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/switch"
 )
+
+# create .nro target
+
+set(NRO_OUT "${CMAKE_BINARY_DIR}/switch/openxcom.nro")
+set(NRO_ICON "${CMAKE_SOURCE_DIR}/res/openxcom_256.jpg")
+set(NACP_OUT "${CMAKE_BINARY_DIR}/switch/openxcom.nacp")
+set(NACP_NAME "OpenXcom")
+set(NACP_AUTHOR "alexart878")
+set(NACP_VERSION "1.0")
+
+if(NOT COMMAND nx_generate_nacp)
+  message(FATAL_ERROR "The `nx_generate_nacp` cmake command is not available. Please use an appropriate Nintendo Switch toolchain.")
+endif()
+
+if(NOT COMMAND nx_create_nro)
+  message(FATAL_ERROR "The `nx_create_nro` cmake command is not available. Please use an appropriate Nintendo Switch toolchain.")
+endif()
+
+nx_generate_nacp(
+  ${NACP_OUT}
+  NAME ${NACP_NAME}
+  AUTHOR ${NACP_AUTHOR}
+  VERSION ${NACP_VERSION}
+)
+
+nx_create_nro(
+  openxcom
+  OUTPUT ${NRO_OUT}
+  ICON ${NRO_ICON}
+  NACP ${NACP_OUT}
+)
