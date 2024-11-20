@@ -447,3 +447,6 @@ nx_create_nro(
   ICON ${NRO_ICON}
   NACP ${NACP_OUT}
 )
+
+# install .nro to desired dir
+install(FILES ${NRO_OUT} DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}")

@@ -202,7 +202,7 @@ if ( BUILD_PACKAGE )
 )
 endif()
 
-if ( NOT WIN32 )
+if ( NOT WIN32 AND NOT SWITCH )
   install(FILES "${CMAKE_SOURCE_DIR}/res/linux/openxcom.desktop"
     DESTINATION "${CMAKE_INSTALL_FULL_DATAROOTDIR}/applications")
   install(FILES "${CMAKE_SOURCE_DIR}/res/linux/icons/openxcom_48x48.png"

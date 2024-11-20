@@ -1,0 +1,141 @@
+#!/usr/bin/env bash
+# By Morgan Hardwood, modified by alexart878
+# Version 2024-11-20
+# This script gets the latest source code for the given program and compiles it.
+
+# Program and repository details
+prog="openxcom"
+repo="https://github.com/alexart878/OpenXcom-switch.git"
+master="switch-port"
+
+buildOnly="false"
+buildType="release"
+
+# Command-line arguments
+basePath=""
+while getopts "bdh?-p:" opt; do
+    case "${opt}" in
+        b)  buildOnly="true"
+            ;;
+        d)  buildType="debug"
+            ;;
+        p)  basePath="${OPTARG}"
+            ;;
+        h|\?|-) printf '%s\n' "This script gets the latest source code for ${prog} and compiles it." \
+                "" \
+                "  -b" \
+                "     Optional. Build only, without updating the source." \
+                "  -d" \
+                "     Optional. Compile a debug build." \
+                "  -p [path]" \
+                "     Optional. Specify a base directory for cloning and installation. If invalid, defaults will be used." \
+                ""
+            exit 0
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+[ "$1" = "--" ] && shift
+
+# Validate basePath or fallback to default
+if [[ -n "$basePath" && -d "$basePath" && -w "$basePath" ]]; then
+    printf '%s\n' "Using custom base path: ${basePath}"
+else
+    basePath="$HOME/programs"
+    printf '%s\n' "Invalid or no base path provided. Falling back to default: ${basePath}"
+fi
+
+# Set paths
+cloneDir="${basePath}/code-${prog}"
+buildDir="${cloneDir}/build"
+installDir="${basePath}/${prog}"
+
+# Adjust paths for debug or non-master branches
+branch=""
+if [[ -d "$cloneDir" ]]; then
+    pushd "$cloneDir" 1>/dev/null || exit 1
+    branch="$(git rev-parse --abbrev-ref HEAD)"
+    popd 1>/dev/null
+fi
+
+if [[ $branch != $master || $buildType != release ]]; then
+    buildDir="${cloneDir}/build-${branch}-${buildType}"
+    installDir="${basePath}/${prog}-${branch}-${buildType}"
+fi
+
+printf '%s\n' "" "Program name: ${prog}" \
+    "Build type: ${buildType}" \
+    "Build without updating: ${buildOnly}" \
+    "Base directory: ${basePath}" \
+    "Clone directory: ${cloneDir}" \
+    "Build directory: ${buildDir}" \
+    "Install directory: ${installDir}" ""
+
+# Clone if needed
+cloned="false"
+updates="false"
+if [[ ! -d "$cloneDir" ]]; then
+    mkdir -p "$basePath" || exit 1
+    git clone "$repo" "$cloneDir" || exit 1
+    pushd "$cloneDir" 1>/dev/null || exit 1
+    cloned="true"
+else
+    pushd "$cloneDir" 1>/dev/null || exit 1
+    git fetch
+    if [[ $(git rev-parse HEAD) != $(git rev-parse '@{u}') ]]; then
+        updates="true"
+    fi
+fi
+
+# Pull updates if necessary
+if [[ "$updates" = "true" && "$buildOnly" = "false" ]]; then
+    git pull || exit 1
+fi
+
+# Quit if no updates and build-only flag not set
+existsExe="false"
+exeRelativePath=""
+exe="${prog}"
+exePath="${exeRelativePath:+${exeRelativePath}/}${exe}"
+if [[ -e "${installDir}/${exePath}" ]]; then
+    existsExe="true"
+fi
+
+if [[ "$cloned" = "false" && "$buildOnly" = "false" && "$updates" = "false" && "$existsExe" = "true" ]]; then
+    printf '%s\n' "No updates, nothing to do."
+    exit 0
+fi
+
+# Prepare folders
+rm -rf "${installDir}"
+mkdir -p "${buildDir}" "${installDir}" || exit 1
+cd "${buildDir}" || exit 1
+
+# Configure and compile
+cmake \
+    -DCMAKE_INSTALL_PREFIX:STRING="${installDir}" \
+    -DCMAKE_BUILD_TYPE="$buildType" \
+    -DSWITCH=ON \
+    -DCMAKE_TOOLCHAIN_FILE="${DEVKITPRO}/cmake/Switch.cmake" \
+    "$cloneDir" || exit 1
+
+make --jobs="$(nproc --all)" install || exit 1
+
+# Finished
+
+printf '%s\n' "" \
+    "OpenXcom requires resources from the original UFO: Enemy Unknown or Terror from the Deep." \
+    "" \
+    "Installation (Switch Version):" \
+    "    1. Copy the following folders from the original, unpatched games" \
+    "        UFO: Enemy Unknown or Terror from the Deep" \
+    "        to sdmc:/switch/openxcom/UFO or sdmc:/switch/openxcom/TFTD" \
+    "        GEODATA, GEOGRAPH, MAPS, ROUTES, SOUND, TERRAIN, UFOGRAPH, UFOINTRO and UNITS" \
+    "        (folders are case-sensitive)" \
+    "" \
+    "    2. Overwrite those folders with the ones from the 'OpenXcom UFO Patch':" \
+    "        https://openxcom.org/downloads-extras/"
+
+printf '%s\n' "" "To run ${prog}.nro, use only non-applet mode! IMPORTANT: If you create app forwarder, DO NOT enable video capture, otherwise you'll get CPU boost after app close!" ""
+
+popd 1>/dev/null
