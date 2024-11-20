@@ -342,205 +342,77 @@ set ( ufopedia_src
   Ufopaedia/UfopaediaStartState.cpp
 )
 
-# NOTE: to build with clang *and* libc++ on Linux, you need to call cmake like so:
-# cmake -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_COMPILER=clang++ \
-#     -D CMAKE_CXX_FLAGS=-stdlib=libc++ -D CMAKE_EXE_LINKER_FLAGS=-stdlib=libc++
-#     -D CMAKE_BUILD_TYPE=Release ...
-# so both compiler and linker need the flag, otherwise linking breaks or uses libstdc++
-# This requires yaml-cpp to also be linked to libc++ instead of libstdc++
+set( NX_src
+  NSwitch/SwitchTools.cpp
+  NSwitch/SwitchController.cpp
+)
 
-set ( data_install_dir bin )
-if ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" AND "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" )
-  add_definitions ( -D_DEBUG )
-endif ()
-if ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" OR CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
-  if ( "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR ENABLE_WARNING )
-    # Enable more GCC warnings if requested or we are doing a Debug build.
-    add_compile_options ( -Wall
-      -Winit-self
-      -Wmissing-include-dirs
-      -Wunknown-pragmas
-      -Wmissing-format-attribute
-      -Wredundant-decls
-      -Wformat-security
-      -Wtype-limits
-      -Wempty-body
-      -Wuninitialized
-      -Wignored-qualifiers
-# These warning options actually generate way too many warnings. Should be enabled later.
-#      -Weffc++
-#      -Winline
-#      -Wshadow
-      )
-    if ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
-      # add warning flags recognized by g++ but not by clang
-      add_compile_options (
-	  )
-    elseif ( CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
-      # add warning flags recognized by clang but not by g++
-    endif ()
-    if ( FATAL_WARNING )
-      add_compile_options ( -Werror )
-    endif ()
-  endif ()
+set(DEVKITPRO $ENV{DEVKITPRO})
+set(CMAKE_SYSTEM_NAME Linux)
+set(CMAKE_SYSTEM_PROCESSOR aarch64)
 
-# These warnings aren't worth polluting the code for
-  add_compile_options (
-    -Wno-unused-function              # cross-platform functions
-    )
-  if ( "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" )
-    # add warning flags recognized by g++ but not by clang
-    add_compile_options (
-      )
-  elseif ( CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
-    # add warning flags recognized by clang but not by g++
-    add_compile_options (
-      )
-  endif ()
-endif ()
+set(CMAKE_C_COMPILER "${DEVKITPRO}/devkitA64/bin/aarch64-none-elf-gcc")
+set(CMAKE_CXX_COMPILER "${DEVKITPRO}/devkitA64/bin/aarch64-none-elf-g++")
+set(CMAKE_LINKER "${DEVKITPRO}/libnx/switch.ld")
 
-if ( CMAKE_CXX_COMPILER_ID MATCHES "Clang" )
-  if ( ENABLE_CLANG_ANALYSIS )
-    add_compile_options ( --analyze )
-  endif ()
-endif ()
+set(CMAKE_CXX_FLAGS 
+  "${CMAKE_CXX_FLAGS} \
+  -march=armv8-a+crc+crypto \
+  -mtune=cortex-a57 \
+  -mtp=soft \
+  -fPIE \
+  -D__SWITCH__ \
+  -D__NO_OPENGL \
+  -O2 \
+  -ffunction-sections \
+  -flto"
+)
 
-if ( MSVC )
-  if ( ENABLE_WARNING )
-    add_compile_options ( /W${MSVC_WARNING_LEVEL} )
-  else ()
-    # Set warning levels for Debug and Release with debug info
-    set ( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /W${MSVC_WARNING_LEVEL}" )
-    set ( CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} /W${MSVC_WARNING_LEVEL}" )
-  endif ()
-  if ( FATAL_WARNING )
-    add_compile_options ( /WX )
-  endif ( FATAL_WARNING )
-  set ( CMAKE_EXE_LINKER_FLAGS "/manifest:no" )
-  set ( CMAKE_MODULE_LINKER_FLAGS "/manifest:no" ) 
-  set ( CMAKE_SHARED_LINKER_FLAGS="/manifest:no" )
-endif ()
+#set(CMAKE_EXE_LINKER_FLAGS "-specs=${DEVKITPRO}/libnx/switch.specs ${CMAKE_EXE_LINKER_FLAGS}")
 
-if ( WIN32 )
-  set ( application_type WIN32 )
-  set ( openxcom_icon OpenXcom.rc )
-endif ()
+set (openxcom_src ${engine_src} ${root_src} ${basescape_src} ${battlescape_src} ${geoscape_src} ${interface_src} ${menu_src} ${mod_src} ${savegame_src} ${ufopedia_src} ${NX_src})
 
-set ( openxcom_src ${root_src} ${basescape_src} ${battlescape_src} ${engine_src} ${geoscape_src} ${interface_src} ${menu_src} ${mod_src} ${savegame_src} ${ufopedia_src} )
+add_executable (openxcom ${openxcom_src})
 
-set ( install_dest RUNTIME )
-set ( set_exec_path ON )
-set ( install_dest_dir bin )
-if ( UNIX AND NOT APPLE )
-  set ( data_install_dir "${CMAKE_INSTALL_FULL_DATADIR}/openxcom" )
-  add_definitions( -DDATADIR="${data_install_dir}/" )
-endif ()
-if ( APPLE )
-  set ( sdl_src "${MACOS_SDLMAIN_M_PATH}" )
-  set ( openxcom_src ${openxcom_src} ${sdl_src} )
-  set ( openxcom_icon "${PROJECT_SOURCE_DIR}/res/mac/AppIcon.icns" )
-  if ( CREATE_BUNDLE )
-    set ( application_type MACOSX_BUNDLE )
-    set_source_files_properties( ${openxcom_icon} PROPERTIES MACOSX_PACKAGE_LOCATION Resources )
-    set ( MACOSX_BUNDLE_ICON_FILE "AppIcon.icns" )
-    set ( MACOSX_BUNDLE_INFO_STRING ${CPACK_PACKAGE_VENDOR} )
-    set ( MACOSX_BUNDLE_GUI_IDENTIFIER "SupSuper.openxcom" )
-    set ( MACOSX_BUNDLE_LONG_VERSION_STRING ${CPACK_PACKAGE_VERSION} )
-    set ( MACOSX_BUNDLE_SHORT_VERSION_STRING "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}" )
-    set ( MACOSX_BUNDLE_COPYRIGHT "Copyright © 2018 OpenXcom Developers. All rights reserved." )
-    set ( EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR} )
-    set ( install_dest BUNDLE )
-    set ( set_exec_path OFF )
-    set ( install_dest_dir "" )
-    set ( data_install_dir bin )
-    if ( "${CMAKE_GENERATOR}" STREQUAL "Xcode" )
-      set ( bundle_path "${EXECUTABLE_OUTPUT_PATH}/${CMAKE_BUILD_TYPE}/openxcom.app" )
-    else ()
-      set ( bundle_path "${EXECUTABLE_OUTPUT_PATH}/openxcom.app" )
-    endif ()
-  else ()
-    set ( data_install_dir "${CMAKE_INSTALL_FULL_DATADIR}/openxcom" )
-    add_definitions( -DDATADIR="${data_install_dir}/" )
-  endif ()
-endif ()
-if ( set_exec_path )
-  set ( EXECUTABLE_OUTPUT_PATH ${CMAKE_BINARY_DIR}/bin )
-endif ()
+target_include_directories(openxcom 
+  PRIVATE 
+  ${DEVKITPRO}/libnx/include
+  ${DEVKITPRO}/portlibs/switch/include
+  ${DEVKITPRO}/portlibs/switch/include/SDL2
+  ${DEVKITPRO}/devkitA64/aarch64-none-elf/include
+)
 
-if ( FORCE_INSTALL_DATA_TO_BIN )
-  set ( data_install_dir bin )
-endif ()
+target_link_directories(openxcom
+  PRIVATE
+  ${DEVKITPRO}/libnx/lib
+  ${DEVKITPRO}/portlibs/switch/lib
+)
 
-add_executable ( openxcom  ${application_type} ${openxcom_src} ${openxcom_icon} )
-install ( TARGETS openxcom ${install_dest} DESTINATION ${CMAKE_INSTALL_BINDIR} )
-# Extra link flags for Windows. They need to be set before the SDL/YAML link flags, otherwise you will get strange link errors ('Undefined reference to WinMain@16')
-if ( WIN32 )
-  set ( basic_windows_libs advapi32.lib shell32.lib shlwapi.lib )
-  if ( MINGW )
-    set ( basic_windows_libs ${basic_windows_libs} mingw32 -mwindows )
-    set ( static_flags  -static )
-    set ( SDLMIXER_LIBRARY "${SDLMIXER_LIBRARY} -lwinmm" )
-  endif ()
-  set ( system_libs ${basic_windows_libs} SDLmain ${static_flags} )
-endif ()
+target_link_libraries(openxcom
+  "-Wl,--start-group"
+  nx
+  SDL2
+  SDL2_image
+  SDL2_mixer
+  yaml-cpp
+  #
+  drm_nouveau
+  EGL
+  glapi
+  jpeg
+  modplug
+  mpg123
+  ogg
+  opus
+  opusfile
+  png
+  webp
+  vorbisidec
+  z
+  "-Wl,--end-group"
+)
 
-# backtrace(3) requires libexecinfo on some *BSD systems
-if (${CMAKE_SYSTEM_NAME} MATCHES FreeBSD OR ${CMAKE_SYSTEM_NAME} MATCHES NetBSD OR ${CMAKE_SYSTEM_NAME} MATCHES OpenBSD)
-  set ( system_libs -lexecinfo )
-endif ()
-
-target_link_libraries ( openxcom ${system_libs} ${SDLIMAGE_LIBRARY} ${SDLMIXER_LIBRARY} ${SDLGFX_LIBRARY} ${SDL_LIBRARY} ${OPENGL_LIBRARIES} debug ${YAMLCPP_LIBRARY_DEBUG} optimized ${YAMLCPP_LIBRARY} )
-
-# Pack libraries into bundle and link executable appropriately
-if ( APPLE AND CREATE_BUNDLE )
-  include ( PostprocessBundle )
-  postprocess_bundle ( openxcom ${bundle_path} )
-endif ()
-
-set ( bin_data_dirs TFTD UFO common standard )
-foreach ( binpath ${bin_data_dirs} )
-  if ( APPLE AND CREATE_BUNDLE )
-    add_custom_command ( TARGET openxcom
-      POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/bin/${binpath} ${bundle_path}/Contents/Resources/${binpath}
-	  VERBATIM )
-  else ()
-    add_custom_command ( TARGET openxcom
-      POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_SOURCE_DIR}/bin/${binpath} ${EXECUTABLE_OUTPUT_PATH}/${binpath}
-	  VERBATIM )
-  endif ()
-  install ( DIRECTORY ${CMAKE_SOURCE_DIR}/bin/${binpath} DESTINATION ${data_install_dir} )
-endforeach()
-
-# Copy Windows DLLs to bin folder
-if ( WIN32 )
-  if ( CMAKE_CL_64 )
-    file ( GLOB Windows_dll "${DEPS_DIR}/lib/x64/*.dll" )
-  else ( )
-    file ( GLOB Windows_dll "${DEPS_DIR}/lib/Win32/*.dll" )
-  endif()
-  foreach ( dll ${Windows_dll} )
-    add_custom_command ( TARGET openxcom
-      POST_BUILD
-      COMMAND ${CMAKE_COMMAND} -E copy ${dll} ${EXECUTABLE_OUTPUT_PATH}
-	  VERBATIM )
-    install ( FILES ${dll} DESTINATION bin)
-  endforeach()
-endif ()
-
-#Setup source groups for IDE
-if ( MSVC OR "${CMAKE_GENERATOR}" STREQUAL "Xcode" )
-  source_group ( "Basescape" FILES ${basescape_src} )
-  source_group ( "Battlescape" FILES ${battlescape_src} )
-  source_group ( "Engine" FILES ${engine_src} )
-  source_group ( "Geoscape" FILES ${geoscape_src} )
-  source_group ( "Interface" FILES ${interface_src} )
-  source_group ( "Menu" FILES ${menu_src} )
-  source_group ( "Mod" FILES ${mod_src} )
-  source_group ( "Savegame" FILES ${savegame_src} )
-  source_group ( "Ufopedia" FILES ${ufopedia_src} )
-  if ( APPLE )
-    source_group ( "SDL" FILES ${sdl_src} )
-  endif ()
-endif ()
+# Set output directory for Switch
+set_target_properties(openxcom PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/switch"
+)
