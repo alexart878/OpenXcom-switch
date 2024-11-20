@@ -12,12 +12,33 @@ Without the efforts put in by [SupSuper](https://github.com/SupSuper) and OpenXc
 - Modified build files and scripts, to bring fluid devkit toolchain integration
 - Docked and handheld recognition, screen resolution changes on game's start
 
+## Controls
+
+I used most comfortable layout (IMHO, can be remapped through game's controls menu):
+
+- Left stick: mouse move
+- Right stick: map scrolling
+- A: mouse left button
+- B: mouse right button
+- X: inventory
+- Y: map
+- L1/R1: switch soldiers
+- L2/R2: quick save/load
+- L3: ctrl mode
+- R3: center on selected soldier
+- Minus: game menu (pause)
+- Plus: end turn
+- Dpad up/down: floor view up/down
+- Dpad left/right: use weapon in left/right hand
+
 ## Installation
 
 - Go to releases page, and grab latest .nro executable
 - Obtain legal copy of XCOM: UFO Defense and/or XCOM: TFTD, for steam, files in:
-        UFO: "Steam\SteamApps\common\XCom UFO Defense\XCOM"
-        TFTD: "Steam\SteamApps\common\X-COM Terror from the Deep\TFD"
+```
+  UFO: "Steam\SteamApps\common\XCom UFO Defense\XCOM"
+  TFTD: "Steam\SteamApps\common\X-COM Terror from the Deep\TFD"
+```
 - Use "bin" folder from this repo, rename it to "openxcom" and place somewhere on SD
 - Place openxcom.nro file to the root of this folder
 - Look up UFO/README.txt and TFTD/README.txt in this folder, and place data accordingly
@@ -59,8 +80,10 @@ Those, who want improve something, or just compile by their own, should follow n
 - Download switch-sdl2, switch-sdl2_gfx, switch-sdl2_image, switch-sdl2_mixer, switch-sdl2_ttf
 - Tricky part: compile [yaml-cpp](https://github.com/jbeder/yaml-cpp) with devkitPRO, place includes/lib to $DEVKITPRO paths
 - For cmake:
-        cd OpenXcom-switch
-        mkdir build && cd build
-        cmake .. -DSWITCH=ON -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/cmake/Switch.cmake -DCMAKE_BUILD_TYPE=Release/Debug/None
-        make
+```
+cd OpenXcom-switch
+mkdir build && cd build
+cmake .. -DSWITCH=ON -DCMAKE_TOOLCHAIN_FILE=$DEVKITPRO/cmake/Switch.cmake -DCMAKE_BUILD_TYPE=Release/Debug/None
+make
+```
 - Also, you can use scripts/build-switch for automated compile process
