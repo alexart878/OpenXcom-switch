@@ -99,6 +99,10 @@ Game::Game(const std::string &title) : _screen(0), _cursor(0), _lang(0), _save(0
 	_lang = new Language();
 
 	_timeOfLastFrame = 0;
+
+	#ifdef __SWITCH__
+	_controller = new SwitchController(this, _screen);
+	#endif
 }
 
 /**
@@ -113,6 +117,10 @@ Game::~Game()
 	{
 		delete *i;
 	}
+
+	#ifdef __SWITCH__
+	delete _controller;
+	#endif
 
 	SDL_FreeCursor(SDL_GetCursor());
 
@@ -161,7 +169,13 @@ void Game::run()
 			// Refresh mouse position
 			SDL_Event ev;
 			int x, y;
-			SDL_GetMouseState(&x, &y);
+
+			#ifdef __SWITCH__
+				_controller->getMouseState(&x, &y);
+			#else
+				SDL_GetMouseState(&x, &y);
+			#endif
+			
 			ev.type = SDL_MOUSEMOTION;
 			ev.motion.x = x;
 			ev.motion.y = y;
@@ -238,6 +252,9 @@ void Game::run()
 					}
 					break;
 				case SDL_MOUSEMOTION:
+					#ifdef __SWITCH__
+					_controller->setPointerPosXY(_event.motion.x, _event.motion.y);
+					#endif
 				case SDL_MOUSEBUTTONDOWN:
 				case SDL_MOUSEBUTTONUP:
 					// Skip mouse events if they're disabled
@@ -245,6 +262,18 @@ void Game::run()
 					// re-gain focus on mouse-over or keypress.
 					runningState = RUNNING;
 					// Go on, feed the event to others
+				
+				#ifdef __SWITCH__
+					
+				case SDL_CONTROLLERAXISMOTION:
+					_controller->handleControllerAxisEvent(_event.caxis);
+
+				case SDL_CONTROLLERBUTTONDOWN:
+				case SDL_CONTROLLERBUTTONUP:
+					_controller->handleControllerButtonEvent(_event.cbutton);
+				
+				#endif
+				
 				default:
 					Action action = Action(&_event, _screen->getXScale(), _screen->getYScale(), _screen->getCursorTopBlackBand(), _screen->getCursorLeftBlackBand());
 					_screen->handle(&action);
@@ -282,6 +311,13 @@ void Game::run()
 				break;
 			}
 		}
+
+		#ifdef __SWITCH__
+
+		_controller->processTouchInput();
+		_controller->processControllerAxisMotion();
+
+		#endif
 		
 		// Process rendering
 		if (runningState != PAUSED)
@@ -338,6 +374,19 @@ void Game::run()
 
 	Options::save();
 }
+
+#ifdef __SWITCH__
+
+void Game::ActivateAction(SDL_Event ev)
+{
+	Action action = Action(&ev, _screen->getXScale(), _screen->getYScale(), _screen->getCursorTopBlackBand(), _screen->getCursorLeftBlackBand());
+	_screen->handle(&action);
+	_cursor->handle(&action);
+	_fpsCounter->handle(&action);
+	_states.back()->handle(&action);
+}
+
+#endif
 
 /**
  * Stops the state machine and the game is shut down.

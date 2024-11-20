@@ -65,6 +65,12 @@ OptionInfo::OptionInfo(const std::string &id, std::string *option, const char *d
 	_def.s = def;
 }
 
+OptionInfo::OptionInfo(const std::string &id, SDL_KeyWrapper *option, SDL_KeyWrapper def, const std::string &desc, const std::string &cat) : _id(id), _desc(desc), _cat(cat), _type(OPTION_KEY)
+{
+	_ref.k = &(option->_keyValue);
+	_def.k = def._keyValue;
+}
+
 /**
  * Loads an option value from the corresponding YAML.
  * @param node Options YAML node.

@@ -21,7 +21,7 @@
 #include <vector>
 #include <fstream>
 #include <algorithm>
-#include <SDL_gfxPrimitives.h>
+#include <SDL2_gfxPrimitives.h>
 #include <SDL_image.h>
 #include <SDL_endian.h>
 #include "../lodepng.h"
@@ -31,7 +31,7 @@
 #include "ShaderMove.h"
 #include "Unicode.h"
 #include <stdlib.h>
-#ifdef _WIN32
+#if defined _WIN32 || defined __SWITCH__
 #include <malloc.h>
 #endif
 #if defined(__MINGW32__) && !defined(__MINGW64_VERSION_MAJOR)
@@ -73,7 +73,15 @@ inline void* NewAligned(int bpp, int width, int height)
 	const int total = pitch * height;
 	void* buffer = 0;
 
-#ifndef _WIN32
+#ifdef __SWITCH__
+
+    buffer = memalign(16, total);
+    if (!buffer)
+    {
+        throw std::runtime_error("Failed to allocate aligned memory");
+    }
+
+#elif !defined _WIN32
 
 	#ifdef __MORPHOS__
 
@@ -741,7 +749,35 @@ void Surface::drawRect(Sint16 x, Sint16 y, Sint16 w, Sint16 h, Uint8 color)
  */
 void Surface::drawLine(Sint16 x1, Sint16 y1, Sint16 x2, Sint16 y2, Uint8 color)
 {
-	lineColor(_surface, x1, y1, x2, y2, Palette::getRGBA(getPalette(), color));
+    int dx = abs(x2 - x1), sx = x1 < x2 ? 1 : -1;
+    int dy = abs(y2 - y1), sy = y1 < y2 ? 1 : -1;
+    int err = (dx > dy ? dx : -dy) / 2;
+
+    while (true) {
+        setPixel(x1, y1, color); // Inline this if possible
+        if (x1 == x2 && y1 == y2) break;
+
+        int e2 = err;
+        err -= (e2 > -dx) * dy;
+        x1 += (e2 > -dx) * sx;
+        err += (e2 < dy) * dx;
+        y1 += (e2 < dy) * sy;
+    }
+}
+
+/**
+ * Draws a horizontal line on the surface.
+ * @param cx X start coordinate in pixels.
+ * @param cy Y start coordinate in pixels.
+ * @param length line length in pixels.
+ * @param color Color of the line.
+ */
+void Surface::drawHorizontalLine(Sint16 cx, Sint16 cy, Sint16 length, Uint8 color) {
+	Sint16 start = cx - length;
+	Sint16 end = cx + length;
+	for (Sint16 i = start; i <= end; i++) {
+		setPixel(i, cy, color);
+	}
 }
 
 /**
@@ -753,7 +789,29 @@ void Surface::drawLine(Sint16 x1, Sint16 y1, Sint16 x2, Sint16 y2, Uint8 color)
  */
 void Surface::drawCircle(Sint16 x, Sint16 y, Sint16 r, Uint8 color)
 {
-	filledCircleColor(_surface, x, y, r, Palette::getRGBA(getPalette(), color));
+    Sint16 dx = 0;
+    Sint16 dy = r;
+    Sint16 d = 1 - r;
+
+    while (dy >= dx) {
+        bool isInBoundsYPlusDy = y + dy < _surface->h;
+        bool isInBoundsYMinusDy = y - dy >= 0;
+        bool isInBoundsYPlusDx = y + dx < _surface->h;
+        bool isInBoundsYMinusDx = y - dx >= 0;
+
+        if (isInBoundsYPlusDy) drawHorizontalLine(x, y + dy, dx, color);
+        if (isInBoundsYMinusDy) drawHorizontalLine(x, y - dy, dx, color);
+        if (isInBoundsYPlusDx) drawHorizontalLine(x, y + dx, dy, color);
+        if (isInBoundsYMinusDx) drawHorizontalLine(x, y - dx, dy, color);
+
+        dx++;
+        if (d < 0) {
+            d += 2 * dx + 1;
+        } else {
+            dy--;
+            d += 2 * (dx - dy) + 1;
+        }
+    }
 }
 
 /**
@@ -765,7 +823,57 @@ void Surface::drawCircle(Sint16 x, Sint16 y, Sint16 r, Uint8 color)
  */
 void Surface::drawPolygon(Sint16 *x, Sint16 *y, int n, Uint8 color)
 {
-	filledPolygonColor(_surface, x, y, n, Palette::getRGBA(getPalette(), color));
+    Sint16 minY = y[0];
+    Sint16 maxY = y[0];
+    
+	for (int i = 1; i < n; i++) {
+        if (y[i] < minY) minY = y[i];
+        if (y[i] > maxY) maxY = y[i];
+    }
+
+    // Edge table: store edges with precomputed slopes
+    struct Edge {
+        Sint16 x1, y1, x2, y2;
+        float slopeInverse;
+    };
+    
+	Edge edges[32]; // Assume a maximum of 32 edges
+    int edgeCount = 0;
+
+    for (int i = 0; i < n; i++) {
+        int j = (i + 1) % n;
+        if (y[i] != y[j]) {
+            edges[edgeCount++] = {
+                x[i], y[i], x[j], y[j],
+                static_cast<float>(x[j] - x[i]) / (y[j] - y[i])
+            };
+        }
+    }
+
+    for (Sint16 scanY = minY; scanY <= maxY; scanY++) {
+        Sint16 intersections[32];
+        int intersectionCount = 0;
+
+        for (int i = 0; i < edgeCount; i++) {
+            Sint16 y1 = edges[i].y1;
+            Sint16 y2 = edges[i].y2;
+            if ((scanY >= y1 && scanY < y2) || (scanY >= y2 && scanY < y1)) 
+			{
+                float intersectX = edges[i].x1 + (scanY - y1) * edges[i].slopeInverse;
+                intersections[intersectionCount++] = static_cast<Sint16>(intersectX);
+            }
+        }
+
+        std::sort(intersections, intersections + intersectionCount);
+
+        for (int k = 0; k < intersectionCount; k += 2) {
+            if (k + 1 < intersectionCount) {
+                for (Sint16 scanX = intersections[k]; scanX <= intersections[k + 1]; scanX++) {
+                    setPixel(scanX, scanY, color);
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -779,7 +887,59 @@ void Surface::drawPolygon(Sint16 *x, Sint16 *y, int n, Uint8 color)
  */
 void Surface::drawTexturedPolygon(Sint16 *x, Sint16 *y, int n, Surface *texture, int dx, int dy)
 {
-	texturedPolygon(_surface, x, y, n, texture->getSurface(), dx, dy);
+    SDL_Surface *textureSurface = texture->getSurface();
+
+    Sint16 minY = y[0], maxY = y[0];
+    for (int i = 1; i < n; i++) {
+        if (y[i] < minY) minY = y[i];
+        if (y[i] > maxY) maxY = y[i];
+    }
+
+    float slopeInverses[32]; // Assume a maximum of 32 edges
+    for (int i = 0; i < n; i++) {
+        int j = (i + 1) % n;
+        if (y[i] != y[j]) {
+            slopeInverses[i] = static_cast<float>(x[j] - x[i]) / (y[j] - y[i]);
+        } else {
+            slopeInverses[i] = 0;
+        }
+    }
+
+    for (Sint16 scanY = minY; scanY <= maxY; scanY++) {
+        Sint16 intersections[32];
+        int intersectionCount = 0;
+
+        for (int i = 0; i < n; i++) {
+            int j = (i + 1) % n;
+            if ((y[i] < scanY && y[j] >= scanY) || (y[j] < scanY && y[i] >= scanY)) {
+                float intersectX = x[i] + (scanY - y[i]) * slopeInverses[i];
+                intersections[intersectionCount++] = static_cast<Sint16>(intersectX);
+            }
+        }
+
+        std::sort(intersections, intersections + intersectionCount);
+
+        for (int k = 0; k < intersectionCount; k += 2) {
+            if (k + 1 < intersectionCount) {
+                Sint16 startX = intersections[k];
+                Sint16 endX = intersections[k + 1];
+
+                for (Sint16 scanX = startX; scanX <= endX; scanX++) {
+
+                    int texX = (scanX - dx) % textureSurface->w;
+                    int texY = (scanY - dy) % textureSurface->h;
+
+                    if (texX < 0) texX += textureSurface->w;
+                    if (texY < 0) texY += textureSurface->h;
+
+                    Uint8 *texturePixels = (Uint8 *)textureSurface->pixels;
+                    Uint8 texPixel = texturePixels[(texY * textureSurface->w) + texX];
+
+                    setPixel(scanX, scanY, texPixel);
+                }
+            }
+        }
+    }
 }
 
 /**
@@ -791,7 +951,42 @@ void Surface::drawTexturedPolygon(Sint16 *x, Sint16 *y, int n, Surface *texture,
  */
 void Surface::drawString(Sint16 x, Sint16 y, const char *s, Uint8 color)
 {
-	stringColor(_surface, x, y, s, Palette::getRGBA(getPalette(), color));
+    // Lock the surface to directly access its pixels
+    //SDL_LockSurface(_surface);
+
+    // Get a pointer to the pixel data of the surface
+    Uint8* pixels = (Uint8*)_surface->pixels;
+    int pitch = _surface->pitch / sizeof(Uint32);
+
+    // Iterate through each character in the string
+    for (const char* p = s; *p != '\0'; p++) {
+        // Render each character here by drawing its pixels to the surface
+        // You would need to implement a function to render each character's pixels based on the font you're using.
+        // Here's a simplified assumption for character width/height, assuming 8x8 character size:
+        
+        char c = *p;
+
+        // Get the character's bitmap data from a font (this would be custom depending on the font you're using)
+        int charWidth = 8; // assuming 8x8 font for each character
+        int charHeight = 8;
+
+        // Loop through the character's pixels and draw them on the surface
+        for (int cy = 0; cy < charHeight; ++cy) {
+            for (int cx = 0; cx < charWidth; ++cx) {
+                // Get pixel value for the character (just an example, assuming you have a way to get it)
+                if (getPixel(cx, cy)) {
+                    int pixelX = x + (p - s) * charWidth + cx;
+                    int pixelY = y + cy;
+                    if (pixelX >= 0 && pixelX < _surface->w && pixelY >= 0 && pixelY < _surface->h) {
+                        pixels[pixelY * pitch + pixelX] = color; // Set pixel color
+                    }
+                }
+            }
+        }
+    }
+
+    // Unlock the surface after modifications
+    //SDL_UnlockSurface(_surface);
 }
 
 /**

@@ -139,6 +139,8 @@ public:
 	void resetCrop();
 	/// Gets the cropping rectangle for the surface.
 	SDL_Rect *getCrop();
+	/// Draws a horizontal line on the surface.
+	inline void drawHorizontalLine(Sint16 cx, Sint16 cy, Sint16 length, Uint8 color);
 	/**
 	 * Changes the color of a pixel in the surface, relative to
 	 * the top-left corner of the surface. Invalid positions are ignored.

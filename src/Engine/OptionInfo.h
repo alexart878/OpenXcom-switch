@@ -27,6 +27,11 @@ namespace OpenXcom
 
 enum OptionType { OPTION_BOOL, OPTION_INT, OPTION_STRING, OPTION_KEY };
 
+struct SDL_KeyWrapper { 
+	operator SDL_Keycode() const { return _keyValue; }
+	SDL_Keycode _keyValue; 
+};
+
 /**
  * Helper class that ties metadata to particular options to help in serializing
  * and stuff. The option variable must already exist, this info just points to it.
@@ -46,6 +51,8 @@ public:
 	OptionInfo(const std::string &id, int *option, int def, const std::string &desc = "", const std::string &cat = "");
 	/// Creates a string option.
 	OptionInfo(const std::string &id, std::string *option, const char *def, const std::string &desc = "", const std::string &cat = "");
+	/// Creates a SDL_Keycode option.
+	OptionInfo(const std::string &id, SDL_KeyWrapper *option, SDL_KeyWrapper def, const std::string &desc, const std::string &cat);
 	/// Gets a bool option pointer.
 	bool *asBool() const;
 	/// Gets an int option pointer.

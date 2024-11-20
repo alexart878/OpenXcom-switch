@@ -22,6 +22,9 @@
 #include "../Engine/Font.h"
 #include "../Engine/Timer.h"
 #include "../Engine/Options.h"
+#ifdef __SWITCH__
+#include "../NSwitch/SwitchTools.h"
+#endif
 
 namespace OpenXcom
 {
@@ -444,6 +447,13 @@ void TextEdit::mousePress(Action *action, State *state)
 			_caretPos = c;
 		}
 	}
+
+	#ifdef __SWITCH__
+	
+	Switch::callSwitchKeyboardDirty(this);
+
+	#endif
+
 	InteractiveSurface::mousePress(action, state);
 }
 

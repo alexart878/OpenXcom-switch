@@ -23,6 +23,9 @@
 #include "Engine/Game.h"
 #include "Engine/Options.h"
 #include "Menu/StartState.h"
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
 
 /** @mainpage
  * @author OpenXcom Developers
@@ -106,6 +109,21 @@ int main(int argc, char *argv[])
 #else
 	Logger::reportingLevel() = LOG_INFO;
 #endif
+
+#ifdef __SWITCH__
+
+	if (!R_SUCCEEDED(fsInitialize()))
+		Log(LOG_FATAL) << "Failed to initialize NX filesystem!";
+
+	hidInitializeTouchScreen();
+
+	padConfigureInput(1, HidNpadStyleSet_NpadStandard);
+
+	PadState pad;
+    padInitializeDefault(&pad);
+
+#endif
+
 	if (!Options::init(argc, argv))
 		return EXIT_SUCCESS;
 	std::ostringstream title;
@@ -119,6 +137,10 @@ int main(int argc, char *argv[])
 	State::setGamePtr(game);
 	game->setState(new StartState);
 	game->run();
+
+#ifdef __SWITCH__
+	fsExit();
+#endif
 
 	// Comment this for faster exit.
 	delete game;

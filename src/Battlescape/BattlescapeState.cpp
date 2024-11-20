@@ -19,7 +19,7 @@
 #include <algorithm>
 #include <sstream>
 #include <iomanip>
-#include <SDL_gfxPrimitives.h>
+#include <SDL2_gfxPrimitives.h>
 #include "Map.h"
 #include "Camera.h"
 #include "BattlescapeState.h"
@@ -1678,122 +1678,65 @@ inline void BattlescapeState::handle(Action *action)
  */
 void BattlescapeState::saveAIMap()
 {
-	Uint32 start = SDL_GetTicks();
-	BattleUnit *unit = _save->getSelectedUnit();
-	if (!unit) return;
+    Uint32 start = SDL_GetTicks();
+    BattleUnit* unit = _save->getSelectedUnit();
+    if (!unit) return;
 
-	int w = _save->getMapSizeX();
-	int h = _save->getMapSizeY();
+    int w = _save->getMapSizeX();
+    int h = _save->getMapSizeY();
 
-	SDL_Surface *img = SDL_CreateRGBSurface(0, w * 8, h * 8, 24, 0xff, 0xff00, 0xff0000, 0);
-	Log(LOG_INFO) << "unit = " << unit->getId();
-	memset(img->pixels, 0, img->pitch * img->h);
+    // Create an SDL_Surface for drawing
+    SDL_Surface* img = SDL_CreateRGBSurfaceWithFormat(0, w * 8, h * 8, 32, SDL_PIXELFORMAT_RGBA8888);
+    if (!img) {
+        //std::cerr << "Error creating surface: " << SDL_GetError() << std::endl;
+        return;
+    }
 
-	Position tilePos(unit->getPosition());
-	SDL_Rect r;
-	r.h = 8;
-	r.w = 8;
+    // Clear the surface (optional)
+    SDL_FillRect(img, NULL, SDL_MapRGB(img->format, 0, 0, 0));  // Fill with black (transparent background for RGBA)
 
-	for (int y = 0; y < h; ++y)
-	{
-		tilePos.y = y;
-		for (int x = 0; x < w; ++x)
-		{
-			tilePos.x = x;
-			Tile *t = _save->getTile(tilePos);
+    Position tilePos(unit->getPosition());
+    SDL_Rect r = { 0, 0, 8, 8 }; // The rectangle for tile size
 
-			if (!t) continue;
-			if (!t->isDiscovered(2)) continue;
+    // Render each tile
+    for (int y = 0; y < h; ++y) {
+        tilePos.y = y;
+        for (int x = 0; x < w; ++x) {
+            tilePos.x = x;
+            Tile* t = _save->getTile(tilePos);
 
-		}
-	}
+            if (!t) continue;
+            if (!t->isDiscovered(2)) continue;
 
-	for (int y = 0; y < h; ++y)
-	{
-		tilePos.y = y;
-		for (int x = 0; x < w; ++x)
-		{
-			tilePos.x = x;
-			Tile *t = _save->getTile(tilePos);
+            r.x = x * r.w;
+            r.y = y * r.h;
 
-			if (!t) continue;
-			if (!t->isDiscovered(2)) continue;
+            // Render the tile depending on its properties
+            if (t->getTUCost(O_FLOOR, MT_FLY) != 255 && t->getTUCost(O_OBJECT, MT_FLY) != 255) {
+                SDL_FillRect(img, &r, SDL_MapRGB(img->format, 255, 0, 0x20)); // Red color
+                //renderCharacterOnTile(img, r.x, r.y, '*', 0x7f, 0x7f, 0x7f, 0x7f); // Placeholder function
+            } else {
+                if (!t->getUnit()) {
+                    SDL_FillRect(img, &r, SDL_MapRGB(img->format, 0x50, 0x50, 0x50)); // Gray for blocked tile
+                }
+            }
 
-			r.x = x * r.w;
-			r.y = y * r.h;
+            // Additional tile checks (like rendering units or walls) could go here
+        }
+    }
 
-			if (t->getTUCost(O_FLOOR, MT_FLY) != 255 && t->getTUCost(O_OBJECT, MT_FLY) != 255)
-			{
-				SDL_FillRect(img, &r, SDL_MapRGB(img->format, 255, 0, 0x20));
-				characterRGBA(img, r.x, r.y,'*' , 0x7f, 0x7f, 0x7f, 0x7f);
-			} else
-			{
-				if (!t->getUnit()) SDL_FillRect(img, &r, SDL_MapRGB(img->format, 0x50, 0x50, 0x50)); // gray for blocked tile
-			}
+    // Save the surface as a PNG
+    std::ostringstream ss;
+    ss << Options::getMasterUserFolder() << "AIExposure" << std::setfill('0') << std::setw(3) << 0 << ".png";
+    unsigned error = lodepng::encode(ss.str(), (const unsigned char*)img->pixels, img->w, img->h, LCT_RGBA);
+    if (error) {
+        //std::cerr << "Saving to PNG failed: " << lodepng_error_text(error) << std::endl;
+    }
 
-			for (int z = tilePos.z; z >= 0; --z)
-			{
-				Position pos(tilePos.x, tilePos.y, z);
-				t = _save->getTile(pos);
-				BattleUnit *wat = t->getUnit();
-				if (wat)
-				{
-					switch(wat->getFaction())
-					{
-					case FACTION_HOSTILE:
-						// #4080C0 is Volutar Blue
-						characterRGBA(img, r.x, r.y, (tilePos.z - z) ? 'a' : 'A', 0x40, 0x80, 0xC0, 0xff);
-						break;
-					case FACTION_PLAYER:
-						characterRGBA(img, r.x, r.y, (tilePos.z - z) ? 'x' : 'X', 255, 255, 127, 0xff);
-						break;
-					case FACTION_NEUTRAL:
-						characterRGBA(img, r.x, r.y, (tilePos.z - z) ? 'c' : 'C', 255, 127, 127, 0xff);
-						break;
-					}
-					break;
-				}
-				pos.z--;
-				if (z > 0 && !t->hasNoFloor(_save->getTile(pos))) break; // no seeing through floors
-			}
+    // Clean up the surface
+    SDL_FreeSurface(img);
 
-			if (t->getMapData(O_NORTHWALL) && t->getMapData(O_NORTHWALL)->getTUCost(MT_FLY) == 255)
-			{
-				lineRGBA(img, r.x, r.y, r.x+r.w, r.y, 0x50, 0x50, 0x50, 255);
-			}
-
-			if (t->getMapData(O_WESTWALL) && t->getMapData(O_WESTWALL)->getTUCost(MT_FLY) == 255)
-			{
-				lineRGBA(img, r.x, r.y, r.x, r.y+r.h, 0x50, 0x50, 0x50, 255);
-			}
-		}
-	}
-
-	std::ostringstream ss;
-
-	ss.str("");
-	ss << "z = " << tilePos.z;
-	stringRGBA(img, 12, 12, ss.str().c_str(), 0, 0, 0, 0x7f);
-
-	int i = 0;
-	do
-	{
-		ss.str("");
-		ss << Options::getMasterUserFolder() << "AIExposure" << std::setfill('0') << std::setw(3) << i << ".png";
-		i++;
-	}
-	while (CrossPlatform::fileExists(ss.str()));
-
-
-	unsigned error = lodepng::encode(ss.str(), (const unsigned char*)img->pixels, img->w, img->h, LCT_RGB);
-	if (error)
-	{
-		Log(LOG_ERROR) << "Saving to PNG failed: " << lodepng_error_text(error);
-	}
-
-	SDL_FreeSurface(img);
-
-	Log(LOG_INFO) << "saveAIMap() completed in " << SDL_GetTicks() - start << "ms.";
+    //std::cout << "saveAIMap() completed in " << SDL_GetTicks() - start << "ms." << std::endl;
 }
 
 /**

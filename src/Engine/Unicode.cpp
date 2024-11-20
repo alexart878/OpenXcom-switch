@@ -46,7 +46,7 @@ std::locale utf8;
  * Store a UTF-8 locale to use when dealing with character conversions.
  * Windows doesn't have a UTF-8 locale so we just use its APIs directly.
  */
-void getUtf8Locale()
+/*void getUtf8Locale()
 {
 	std::string loc;
 #ifndef _WIN32
@@ -82,6 +82,23 @@ void getUtf8Locale()
 		// Well we're stuck with the C locale, hope for the best
 	}
 	Log(LOG_INFO) << "Detected locale: " << utf8.name();
+}*/
+void getUtf8Locale()
+{
+    std::string loc = "en_US.UTF-8";  // Defaulting to en_US.UTF-8 for Switch (or use other default if necessary)
+
+    // Try to create a UTF-8 locale
+    try
+    {
+        utf8 = std::locale(loc.c_str());  // Attempt to create the locale
+    }
+    catch (const std::runtime_error &)
+    {
+        // If locale creation fails, fallback to C locale
+        utf8 = std::locale("");  // Use default C locale
+    }
+
+    //std::cout << "Detected locale: " << utf8.name() << std::endl;
 }
 
 /**

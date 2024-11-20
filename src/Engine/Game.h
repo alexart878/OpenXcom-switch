@@ -20,6 +20,9 @@
 #include <list>
 #include <string>
 #include <SDL.h>
+#ifdef __SWITCH__
+#include "../NSwitch/SwitchController.h"
+#endif
 
 namespace OpenXcom
 {
@@ -31,6 +34,10 @@ class Language;
 class SavedGame;
 class Mod;
 class FpsCounter;
+
+#ifdef __SWITCH__
+class SwitchController;
+#endif
 
 /**
  * The core of the game engine, manages the game's entire contents and structure.
@@ -54,6 +61,10 @@ private:
 	unsigned int _timeOfLastFrame;
 	int _timeUntilNextFrame;
 	static const double VOLUME_GRADIENT;
+
+	#ifdef __SWITCH__
+	SwitchController *_controller;
+	#endif
 
 public:
 	/// Creates a new game and initializes SDL.
@@ -100,6 +111,10 @@ public:
 	void loadLanguages();
 	/// Sets up the audio.
 	void initAudio();
+
+	#ifdef __SWITCH__
+	void ActivateAction(SDL_Event ev);
+	#endif
 };
 
 }

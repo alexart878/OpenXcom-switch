@@ -35,6 +35,9 @@
 #include "Zoom.h"
 #include "Timer.h"
 #include <SDL.h>
+#ifdef __SWITCH__
+#include "../NSwitch/SwitchTools.h"
+#endif
 
 namespace OpenXcom
 {
@@ -276,6 +279,9 @@ SDL_Color *Screen::getPalette() const
 int Screen::getWidth() const
 {
 	int w = 0;
+#ifdef __SWITCH__
+	return Switch::getSwitchScreenWidth();
+#endif	
 	SDL_GetWindowSize(_window, &w, NULL);
 	return w;
 }
@@ -286,6 +292,9 @@ int Screen::getWidth() const
  */
 int Screen::getHeight() const
 {
+#ifdef __SWITCH__
+	return Switch::getSwitchScreenHeight();
+#endif
 	int h = 0;
 	SDL_GetWindowSize(_window, NULL, &h);
 	return h;

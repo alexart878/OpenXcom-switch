@@ -208,6 +208,12 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 		{
 			increment *= 10;
 		}
+		#ifdef __SWITCH__
+		if (i == &Options::controllerPointerSpeed)
+		{
+			increment *= 5;
+		}
+		#endif
 		*i += increment;
 
 		int min = 0, max = 0;
@@ -230,6 +236,12 @@ void OptionsAdvancedState::lstOptionsClick(Action *action)
 			min = 10;
 			max = 120;
 		}
+		#ifdef __SWITCH__
+		else if (i == &Options::controllerPointerSpeed) {
+			min = 0;
+			max = 40;
+		}
+		#endif
 		else if (i == &Options::mousewheelSpeed)
 		{
 			min = 1;

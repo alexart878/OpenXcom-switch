@@ -121,12 +121,16 @@ void ListSaveState::lstSavesPress(Action *action)
 		_lstSaves->setCellText(_lstSaves->getSelectedRow(), 0, "");
 		if (_lstSaves->getSelectedRow() == 0)
 		{
+			#ifndef __SWITCH__
 			_edtSave->setText("");
 			_selected = "";
+			#endif
 		}
 		else
 		{
+			#ifndef __SWITCH__
 			_edtSave->setText(_selected);
+			#endif
 		}
 		_edtSave->setX(_lstSaves->getColumnX(0));
 		_edtSave->setY(_lstSaves->getRowY(_selectedRow));

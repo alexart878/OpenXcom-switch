@@ -69,9 +69,13 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <pwd.h>
+#ifndef __SWITCH__
 #include <execinfo.h>
-#include <cxxabi.h>
 #include <dlfcn.h>
+#else
+#include <switch.h>
+#endif
+#include <cxxabi.h>
 #include "Unicode.h"
 #endif
 #include <SDL.h>
@@ -141,6 +145,9 @@ void showError(const std::string &error)
  */
 static char const *getHome()
 {
+#ifdef __SWITCH__
+	return "/switch/";
+#endif
 	char const *home = getenv("HOME");
 	if (!home)
 	{
@@ -161,6 +168,11 @@ std::vector<std::string> findDataFolders()
 	std::vector<std::string> list;
 #ifdef __MORPHOS__
 	list.push_back("PROGDIR:");
+	return list;
+#endif
+
+#ifdef __SWITCH__
+	list.push_back("./");
 	return list;
 #endif
 
@@ -256,6 +268,11 @@ std::vector<std::string> findUserFolders()
 	return list;
 #endif
 
+#ifdef __SWITCH__
+	list.push_back((std::string) getHome() + "openxcom/userdir/");
+	return list;
+#endif
+
 #ifdef _WIN32
 	char path[MAX_PATH];
 
@@ -333,6 +350,8 @@ std::string findConfigFolder()
 	find_directory(B_USER_SETTINGS_DIRECTORY, 0, true, settings_path, sizeof(settings_path)-strlen("/OpenXcom/"));
 	strcat(settings_path,"/OpenXcom/");
 	return settings_path;
+#elif defined (__SWITCH__)
+	return "/config/openxcom/";
 #else
 	char const *home = getHome();
 	char path[MAXPATHLEN];
@@ -424,6 +443,14 @@ bool createFolder(const std::string &path)
 		return false;
 	else
 		return true;
+#elif defined __SWITCH__
+	Result rc = fsFsCreateDirectory(fsdevGetDeviceFileSystem("sdmc"), path.c_str());
+	if (R_SUCCEEDED(rc)) 
+	{ 
+		return true;
+	}
+	else 
+		return false;
 #else
 	mode_t process_mask = umask(0);
 	int result = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
@@ -1047,6 +1074,8 @@ void stackTrace(void *ctx)
 	Log(LOG_FATAL) << "Unfortunately, no stack trace information is available";
 #endif
 #elif __CYGWIN__
+	Log(LOG_FATAL) << "Unfortunately, no stack trace information is available";
+#elif __SWITCH__
 	Log(LOG_FATAL) << "Unfortunately, no stack trace information is available";
 #else
 	void *frames[32];
